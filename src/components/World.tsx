@@ -81,9 +81,8 @@ export default function World({ serial, stats, reaction, onReactionDone }: World
 
       const rockBody = drawRockBody(PIXI, serial);
       rock.addChild(rockBody);
-      rock.addChild(deadOverlay);
 
-      // Dead overlay (grey semi-transparent rect over the rock)
+      // Dead overlay (grey semi-transparent ellipse shown when pet dies)
       const deadOverlay = new PIXI.Graphics();
       deadOverlay.ellipse(0, 0, TILE_SIZE * TILE_SCALE * 0.5, TILE_SIZE * TILE_SCALE * 0.44)
         .fill({ color: 0x888888, alpha: 0.6 });
