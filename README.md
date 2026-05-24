@@ -124,15 +124,22 @@ Open [http://localhost:3000](http://localhost:3000). Type "adopt a pet rock" to 
 
 ---
 
-## Deploy to Vercel
+## Deploy to Netlify
 
-```bash
-vercel deploy
-```
+The repo includes a `netlify.toml` with the build config and `@netlify/plugin-nextjs` wired in — just connect the repo and it works.
 
-Add all `.env.local` variables to Vercel's environment settings. The Kenney assets under `public/assets/kenney/` are committed to git and deploy automatically.
+1. Push this repo to GitHub (or it's already there)
+2. In [app.netlify.com](https://app.netlify.com), click **Add new site → Import an existing project** and select the repo
+3. Build settings are auto-detected from `netlify.toml` — no changes needed
+4. Under **Site configuration → Environment variables**, add all variables from `.env.example`:
+   - `HEDERA_OPERATOR_ID`, `HEDERA_OPERATOR_KEY`, `HEDERA_NETWORK`
+   - `PET_ROCK_NFT_COLLECTION_ID`
+   - `GOOGLE_API_KEY`
+   - `MPP_RECIPIENT_ADDRESS`, `MPP_CURRENCY`, `MPP_AGENT_PRIVATE_KEY`
+   - `NEXT_PUBLIC_APP_URL` — set this to your Netlify site URL (e.g. `https://pet-rock.netlify.app`)
+5. Deploy
 
-Set `NEXT_PUBLIC_APP_URL` to your Vercel deployment URL so NFT metadata images resolve correctly.
+The Kenney assets under `public/assets/kenney/` are committed to git and deploy automatically.
 
 ---
 

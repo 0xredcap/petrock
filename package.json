@@ -15,6 +15,7 @@
     "@hashgraph/sdk": "^2.81.0",
     "@langchain/core": "^1.1.48",
     "@langchain/google-genai": "^2.1.31",
+    "@netlify/plugin-nextjs": "^5.15.11",
     "@pixi/react": "^8.0.5",
     "hedera-agent-kit": "^3.8.2",
     "langchain": "^1.4.2",
