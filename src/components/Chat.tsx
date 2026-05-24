@@ -34,14 +34,38 @@ function detectReaction(reply: string): ReactionType {
 }
 
 const PET_ACTIONS = [
-  { label: "Feed", command: "feed my pet rock", color: "emerald" },
-  { label: "Play", command: "play with my pet rock", color: "yellow" },
-  { label: "Groom", command: "groom my pet rock", color: "blue" },
-  { label: "Sleep", command: "put my pet rock to sleep", color: "purple" },
-  { label: "Status", command: "check my pet rock status", color: "slate" },
+  {
+    label: "Feed",
+    endpoint: "/api/pet/feed",
+    reaction: "fed" as ReactionType,
+    successMsg: "Fed Pet Rock! Hunger +30, mood +5.",
+    color: "emerald",
+  },
+  {
+    label: "Play",
+    endpoint: "/api/pet/play",
+    reaction: "played" as ReactionType,
+    successMsg: "Played with Pet Rock! Mood +30, energy -10.",
+    color: "yellow",
+  },
+  {
+    label: "Groom",
+    endpoint: "/api/pet/groom",
+    reaction: "groomed" as ReactionType,
+    successMsg: "Groomed Pet Rock! Mood +20, energy +10.",
+    color: "blue",
+  },
+  {
+    label: "Sleep",
+    endpoint: "/api/pet/sleep",
+    reaction: "sleeping" as ReactionType,
+    successMsg: "Pet Rock is sleeping. Energy +40, mood -5, hunger -10.",
+    color: "purple",
+  },
 ] as const;
 
 type ActionColor = "emerald" | "yellow" | "blue" | "purple" | "slate";
+type PetAction = typeof PET_ACTIONS[number];
 
 const colorMap: Record<ActionColor, string> = {
   emerald: "bg-emerald-800 border-emerald-500 text-emerald-100 hover:bg-emerald-700",
@@ -98,6 +122,47 @@ export default function Chat({ serial, topicId, onReaction, onPetAdopted, onActi
       }
     } catch {
       setMessages((prev) => [...prev, { role: "ai", content: "Connection error during adopt. Try again." }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function sendDirectAction(
+    endpoint: string,
+    label: string,
+    reaction: ReactionType,
+    successMsg: string,
+  ) {
+    if (loading || !serial || !topicId) return;
+    setMessages((prev) => [...prev, { role: "human", content: label }]);
+    setLoading(true);
+
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serial, topicId }),
+      });
+
+      if (res.status === 402) {
+        setMessages((prev) => [...prev, { role: "ai", content: "Payment required to perform this action." }]);
+        return;
+      }
+
+      const data = await res.json() as { ok?: boolean; txId?: string; error?: string };
+
+      if (data.ok) {
+        setMessages((prev) => [...prev, { role: "ai", content: successMsg }]);
+        onReaction?.(reaction);
+        if (data.txId) {
+          onActivityLog?.({ type: "tx", label, id: data.txId, timestamp: Date.now() });
+        }
+      } else {
+        const errMsg = data.error ?? (res.ok ? "Action failed." : `Server error ${res.status}`);
+        setMessages((prev) => [...prev, { role: "ai", content: `${label} failed: ${errMsg}` }]);
+      }
+    } catch {
+      setMessages((prev) => [...prev, { role: "ai", content: "Connection error. Try again." }]);
     } finally {
       setLoading(false);
     }
@@ -191,11 +256,11 @@ export default function Chat({ serial, topicId, onReaction, onPetAdopted, onActi
       <div className="border-t-2 border-slate-600 p-2 space-y-1.5">
         {serial ? (
           <div className="grid grid-cols-2 gap-1.5">
-            {PET_ACTIONS.filter((a) => a.label !== "Status").map((action) => (
+            {PET_ACTIONS.map((action: PetAction) => (
               <button
                 key={action.label}
                 disabled={loading}
-                onClick={() => sendMessage(action.command)}
+                onClick={() => sendDirectAction(action.endpoint, action.label, action.reaction, action.successMsg)}
                 className={`${btnBase} ${colorMap[action.color as ActionColor]}`}
               >
                 {action.label}
