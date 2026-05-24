@@ -1,0 +1,40 @@
+{
+  "name": "pet-rock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An on-chain Tamagotchi. Raise a pixel-art rock that lives on Hedera.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "setup:collection": "npx tsx scripts/setup-collection.ts",
+    "setup:assets": "curl -L -o /tmp/kenney.zip \"https://www.kenney.nl/media/pages/assets/pixel-platformer/33bb4921eb-1696667883/kenney_pixel-platformer.zip\" && unzip -o /tmp/kenney.zip -d /tmp/kenney/ && mkdir -p public/assets/kenney && cp -r /tmp/kenney/*/Tiles public/assets/kenney/ && cp -r /tmp/kenney/*/Characters public/assets/kenney/ && echo \"Kenney assets installed.\""
+  },
+  "dependencies": {
+    "@hashgraph/sdk": "^2.81.0",
+    "@langchain/core": "^1.1.48",
+    "@langchain/google-genai": "^2.1.31",
+    "@pixi/react": "^8.0.5",
+    "hedera-agent-kit": "^3.8.2",
+    "langchain": "^1.4.2",
+    "mppx": "^0.6.28",
+    "next": "16.2.6",
+    "pixi.js": "^8.18.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "viem": "^2.50.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20.19.41",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "tailwindcss": "^4",
+    "tsx": "^4.22.3",
+    "typescript": "^5"
+  }
+}
