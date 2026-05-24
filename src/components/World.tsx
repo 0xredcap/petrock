@@ -81,6 +81,7 @@ export default function World({ serial, stats, reaction, onReactionDone }: World
 
       const rockBody = drawRockBody(PIXI, serial);
       rock.addChild(rockBody);
+      rock.addChild(deadOverlay);
 
       // Dead overlay (grey semi-transparent rect over the rock)
       const deadOverlay = new PIXI.Graphics();
@@ -149,7 +150,7 @@ export default function World({ serial, stats, reaction, onReactionDone }: World
         const energy = currentStats?.energy ?? 100;
         const alive = currentStats?.alive !== false;
 
-        // Breathing
+        // Breathing — tired squashes the base scale
         const breathSpeed = mood > 70 ? 1500 : mood < 30 ? 3000 : 2000;
         const breathBase = energy < 30 ? 0.9 : 1.0;
         breathT += dt;
@@ -291,7 +292,6 @@ function drawGarden(PIXI: typeof import("pixi.js"), container: import("pixi.js")
   g.rect(0, 0, 4, CANVAS_H).fill({ color: FENCE_COLOR });
   g.rect(CANVAS_W - 4, 0, 4, CANVAS_H).fill({ color: FENCE_COLOR });
 
-  // Fence posts
   for (let col = 0; col <= COLS; col += 2) {
     const x = col * TS;
     g.rect(x - 3, 0, 6, 14).fill({ color: FENCE_COLOR });

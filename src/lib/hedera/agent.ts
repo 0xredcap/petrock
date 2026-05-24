@@ -25,7 +25,7 @@ export function getPetAgent(): AgentApp {
   if (!apiKey) throw new Error("GOOGLE_API_KEY not set");
 
   const llm = new ChatGoogleGenerativeAI({
-    model: "gemini-2.5-flash-lite",
+    model: "gemini-2.0-flash",
     apiKey,
     temperature: 0.7,
   });

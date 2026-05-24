@@ -56,7 +56,7 @@ export const feedPetTool = new DynamicStructuredTool({
       return JSON.stringify({
         success: true,
         txId,
-        message: `Fed Pet Rock #${serial}! Hunger restored +30, mood +5. Transaction: ${txId}`,
+        message: `Fed Pet Rock #${serial}! Hunger +30, mood +5. Transaction: ${txId}`,
       });
     } catch (err) {
       return `Error feeding pet: ${err instanceof Error ? err.message : String(err)}`;
@@ -66,7 +66,7 @@ export const feedPetTool = new DynamicStructuredTool({
 
 export const playPetTool = new DynamicStructuredTool({
   name: "play_with_pet",
-  description: "Play with the pet rock. Boosts mood (+30) but costs energy (-10). Costs 0.5 HBAR.",
+  description: "Play with the pet rock. Boosts mood (+30) but uses energy (-10). Costs 0.5 HBAR.",
   schema: z.object({
     serial: z.number().describe("The NFT serial number of the pet"),
     topicId: z.string().describe("The HCS topic ID for this pet"),
@@ -118,7 +118,7 @@ export const groomPetTool = new DynamicStructuredTool({
 
 export const sleepPetTool = new DynamicStructuredTool({
   name: "sleep_pet",
-  description: "Put the pet rock to sleep. Restores energy (+40) but costs mood (-5) and hunger (-10). Free action.",
+  description: "Put the pet rock to sleep. Restores energy (+40), costs mood (-5) and hunger (-10). Free.",
   schema: z.object({
     serial: z.number().describe("The NFT serial number of the pet"),
     topicId: z.string().describe("The HCS topic ID for this pet"),
@@ -145,7 +145,7 @@ export const sleepPetTool = new DynamicStructuredTool({
 
 export const checkPetTool = new DynamicStructuredTool({
   name: "check_pet_status",
-  description: "Check the current status and stats of the pet rock by reading and replaying HCS messages with time-decay. Free read-only action.",
+  description: "Check the current stats of the pet rock. Replays HCS messages with time-decay. Free.",
   schema: z.object({
     serial: z.number().describe("The NFT serial number of the pet"),
     topicId: z.string().describe("The HCS topic ID for this pet"),
@@ -155,19 +155,14 @@ export const checkPetTool = new DynamicStructuredTool({
       const messages = await readPetMessages(topicId);
       const stats = computeCurrentStats(messages);
 
-      // Check if rock should die
       if (stats.alive && isDead(stats)) {
-        // Write death message
-        const diedAt = new Date().toISOString();
         await submitPetMessage(topicId, {
           action: "died",
           alive: false,
-          died_at: diedAt,
+          died_at: new Date().toISOString(),
         });
 
-        // Burn the NFT
-        const collectionId = process.env.PET_ROCK_NFT_COLLECTION_ID;
-        if (collectionId) {
+        if (process.env.PET_ROCK_NFT_COLLECTION_ID) {
           await burnRock(serial);
         }
 
@@ -175,23 +170,20 @@ export const checkPetTool = new DynamicStructuredTool({
           success: true,
           alive: false,
           died: true,
-          message: `💀 Pet Rock #${serial} has passed away. Hunger and mood both hit zero. The NFT has been burned. RIP little rock.`,
+          message: `💀 Pet Rock #${serial} has passed away. Hunger and mood both hit zero. The NFT has been burned. RIP.`,
         });
       }
 
-      const moodLabel =
-        stats.mood > 70 ? "happy" : stats.mood > 30 ? "neutral" : "sad";
-      const hungerLabel =
-        stats.hunger > 70 ? "full" : stats.hunger > 30 ? "peckish" : "starving";
-      const energyLabel =
-        stats.energy > 70 ? "energetic" : stats.energy > 30 ? "tired" : "exhausted";
+      const moodLabel = stats.mood > 70 ? "happy" : stats.mood > 30 ? "neutral" : "sad";
+      const hungerLabel = stats.hunger > 70 ? "full" : stats.hunger > 30 ? "peckish" : "starving";
+      const energyLabel = stats.energy > 70 ? "energetic" : stats.energy > 30 ? "tired" : "exhausted";
 
       return JSON.stringify({
         success: true,
         serial,
         topicId,
         stats,
-        message: `Pet Rock #${serial} status — Hunger: ${Math.round(stats.hunger)}/100 (${hungerLabel}), Mood: ${Math.round(stats.mood)}/100 (${moodLabel}), Energy: ${Math.round(stats.energy)}/100 (${energyLabel}). Alive: ${stats.alive}.`,
+        message: `Pet Rock #${serial} — Hunger: ${Math.round(stats.hunger)}/100 (${hungerLabel}), Mood: ${Math.round(stats.mood)}/100 (${moodLabel}), Energy: ${Math.round(stats.energy)}/100 (${energyLabel}). Alive: ${stats.alive}.`,
       });
     } catch (err) {
       return `Error checking pet status: ${err instanceof Error ? err.message : String(err)}`;

@@ -28,3 +28,5 @@ export function getHederaClient(): Client {
 
   return _client;
 }
+
+export { parsePrivateKey };
