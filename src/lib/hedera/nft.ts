@@ -8,11 +8,11 @@ import {
   PrivateKey,
   AccountId,
 } from "@hashgraph/sdk";
-import { getHederaClient } from "./client";
+import { getHederaClient, parsePrivateKey } from "./client";
 
 export async function createNftCollection(): Promise<string> {
   const client = getHederaClient();
-  const operatorKey = PrivateKey.fromString(process.env.HEDERA_OPERATOR_KEY!);
+  const operatorKey = parsePrivateKey(process.env.HEDERA_OPERATOR_KEY!);
 
   const tx = await new TokenCreateTransaction()
     .setTokenName("Pet Rock")
@@ -35,7 +35,7 @@ export async function createNftCollection(): Promise<string> {
 
 export async function mintRock(metadataUri: string): Promise<number> {
   const client = getHederaClient();
-  const operatorKey = PrivateKey.fromString(process.env.HEDERA_OPERATOR_KEY!);
+  const operatorKey = parsePrivateKey(process.env.HEDERA_OPERATOR_KEY!);
   const collectionId = process.env.PET_ROCK_NFT_COLLECTION_ID;
 
   if (!collectionId) throw new Error("PET_ROCK_NFT_COLLECTION_ID not set");
@@ -59,7 +59,7 @@ export async function mintRock(metadataUri: string): Promise<number> {
 
 export async function burnRock(serial: number): Promise<string> {
   const client = getHederaClient();
-  const operatorKey = PrivateKey.fromString(process.env.HEDERA_OPERATOR_KEY!);
+  const operatorKey = parsePrivateKey(process.env.HEDERA_OPERATOR_KEY!);
   const collectionId = process.env.PET_ROCK_NFT_COLLECTION_ID;
 
   if (!collectionId) throw new Error("PET_ROCK_NFT_COLLECTION_ID not set");

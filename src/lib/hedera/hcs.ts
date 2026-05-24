@@ -4,7 +4,7 @@ import {
   TopicId,
   PrivateKey,
 } from "@hashgraph/sdk";
-import { getHederaClient } from "./client";
+import { getHederaClient, parsePrivateKey } from "./client";
 
 export interface PetMessage {
   action: string;
@@ -26,7 +26,7 @@ export interface HcsMessage {
 
 export async function createPetTopic(): Promise<string> {
   const client = getHederaClient();
-  const operatorKey = PrivateKey.fromString(process.env.HEDERA_OPERATOR_KEY!);
+  const operatorKey = parsePrivateKey(process.env.HEDERA_OPERATOR_KEY!);
 
   const tx = await new TopicCreateTransaction()
     .setAdminKey(operatorKey.publicKey)
@@ -50,7 +50,7 @@ export async function submitPetMessage(
   message: PetMessage
 ): Promise<string> {
   const client = getHederaClient();
-  const operatorKey = PrivateKey.fromString(process.env.HEDERA_OPERATOR_KEY!);
+  const operatorKey = parsePrivateKey(process.env.HEDERA_OPERATOR_KEY!);
 
   const payload = JSON.stringify({ ...message, timestamp: Date.now() });
 
