@@ -71,6 +71,38 @@ export default function Chat({ serial, topicId, onReaction, onPetAdopted, onActi
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  async function adoptDirectly() {
+    if (loading) return;
+    setMessages((prev) => [...prev, { role: "human", content: "Adopt a pet rock" }]);
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/adopt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ owner: "player" }),
+      });
+
+      const data = await res.json() as { ok?: boolean; serial?: number; topicId?: string; txId?: string; error?: string };
+
+      if (data.ok && data.serial !== undefined && data.topicId) {
+        const reply = `Pet Rock #${data.serial} adopted! Your on-chain rock is alive and waiting. HCS Topic: ${data.topicId}.`;
+        setMessages((prev) => [...prev, { role: "ai", content: reply }]);
+        onPetAdopted?.(data.serial, data.topicId);
+        if (data.txId) {
+          onActivityLog?.({ type: "tx", label: "Adopt NFT", id: data.txId, timestamp: Date.now() });
+        }
+      } else {
+        const errMsg = data.error ?? (res.ok ? "Adopt failed." : `Server error ${res.status}`);
+        setMessages((prev) => [...prev, { role: "ai", content: `Adopt failed: ${errMsg}` }]);
+      }
+    } catch {
+      setMessages((prev) => [...prev, { role: "ai", content: "Connection error during adopt. Try again." }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function sendMessage(userMsg: string) {
     if (loading) return;
     setMessages((prev) => [...prev, { role: "human", content: userMsg }]);
@@ -90,8 +122,9 @@ export default function Chat({ serial, topicId, onReaction, onPetAdopted, onActi
         }),
       });
 
-      const data = await res.json() as { reply?: string; error?: string };
-      const reply = data.reply ?? data.error ?? "Something went wrong.";
+      const data = await res.json() as { reply?: string; error?: string; message?: string; errorMessage?: string };
+      const reply = data.reply ?? data.error ?? data.message ?? data.errorMessage
+        ?? (res.ok ? "No response." : `Server error ${res.status} — try again.`);
 
       setMessages((prev) => [...prev, { role: "ai", content: reply }]);
 
@@ -179,7 +212,7 @@ export default function Chat({ serial, topicId, onReaction, onPetAdopted, onActi
         ) : (
           <button
             disabled={loading}
-            onClick={() => sendMessage("adopt a pet rock for me")}
+            onClick={adoptDirectly}
             className={`${btnBase} w-full bg-emerald-700 border-emerald-500 text-white hover:bg-emerald-600`}
           >
             {loading ? "Adopting..." : "ADOPT A PET ROCK"}
