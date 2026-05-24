@@ -5,5 +5,18 @@
 [build.environment]
   NODE_VERSION = "20"
 
+[functions]
+  included_files = ["public/**"]
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Increase timeout for AI + Hedera routes (free tier max is 26s)
+[functions."api/chat"]
+  timeout = 26
+
+[functions."api/adopt"]
+  timeout = 26
+
+[functions."api/setup/collection"]
+  timeout = 26

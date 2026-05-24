@@ -3,10 +3,6 @@ import { z } from "zod";
 import { submitPetMessage, readPetMessages, createPetTopic } from "@/lib/hedera/hcs";
 import { mintRock, burnRock } from "@/lib/hedera/nft";
 import { computeCurrentStats, isDead } from "@/lib/hedera/stats";
-import { generateRockSvg } from "@/lib/pixel-art/generate";
-import { writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
-
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 export const adoptPetTool = new DynamicStructuredTool({
@@ -16,43 +12,11 @@ export const adoptPetTool = new DynamicStructuredTool({
   schema: z.object({
     owner: z.string().describe("A display name or identifier for the owner"),
   }),
-  func: async ({ owner }) => {
+  func: async ({ owner: _owner }) => {
     try {
-      // Create HCS topic for this pet
       const topicId = await createPetTopic();
+      const serial = await mintRock(`${appUrl}/api/metadata/${Date.now()}`);
 
-      // Determine serial by minting (we'll use a placeholder metadata first)
-      const placeholderMeta = JSON.stringify({ name: "Pet Rock (pending)" });
-      const serial = await mintRock(
-        `${appUrl}/metadata/${Date.now()}.json`
-      );
-
-      // Generate deterministic SVG
-      const svg = generateRockSvg(serial);
-      const svgPath = join(process.cwd(), "public", "rocks", `${serial}.svg`);
-      mkdirSync(join(process.cwd(), "public", "rocks"), { recursive: true });
-      writeFileSync(svgPath, svg, "utf-8");
-
-      // Write metadata JSON
-      const metadata = {
-        name: `Pet Rock #${serial}`,
-        creator: "Pet Rock Agent",
-        description: "A delightful on-chain pet rock that needs love and HBAR to survive.",
-        image: `${appUrl}/rocks/${serial}.svg`,
-        type: "image/svg+xml",
-        format: "HIP412@2.0.0",
-        properties: {
-          born_at: new Date().toISOString(),
-          topic_id: topicId,
-          owner,
-        },
-      };
-
-      const metaPath = join(process.cwd(), "public", "metadata", `${serial}.json`);
-      mkdirSync(join(process.cwd(), "public", "metadata"), { recursive: true });
-      writeFileSync(metaPath, JSON.stringify(metadata, null, 2), "utf-8");
-
-      // Write initial HCS message
       await submitPetMessage(topicId, {
         action: "born",
         hunger: 100,
@@ -66,7 +30,7 @@ export const adoptPetTool = new DynamicStructuredTool({
         success: true,
         serial,
         topicId,
-        message: `Pet Rock #${serial} adopted! NFT minted on Hedera testnet. HCS topic: ${topicId}. Topic and serial saved — your rock is alive and waiting.`,
+        message: `Pet Rock #${serial} adopted! NFT minted on Hedera testnet. HCS topic: ${topicId}. Your rock is alive and waiting.`,
       });
     } catch (err) {
       return `Error adopting pet: ${err instanceof Error ? err.message : String(err)}`;

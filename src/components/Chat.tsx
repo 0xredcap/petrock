@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, FormEvent } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { ReactionType } from "./World";
 
 interface Message {
@@ -33,29 +33,46 @@ function detectReaction(reply: string): ReactionType {
   return null;
 }
 
+const PET_ACTIONS = [
+  { label: "Feed", command: "feed my pet rock", color: "emerald" },
+  { label: "Play", command: "play with my pet rock", color: "yellow" },
+  { label: "Groom", command: "groom my pet rock", color: "blue" },
+  { label: "Sleep", command: "put my pet rock to sleep", color: "purple" },
+  { label: "Status", command: "check my pet rock status", color: "slate" },
+] as const;
+
+type ActionColor = "emerald" | "yellow" | "blue" | "purple" | "slate";
+
+const colorMap: Record<ActionColor, string> = {
+  emerald: "bg-emerald-800 border-emerald-500 text-emerald-100 hover:bg-emerald-700",
+  yellow: "bg-yellow-800 border-yellow-500 text-yellow-100 hover:bg-yellow-700",
+  blue: "bg-blue-800 border-blue-500 text-blue-100 hover:bg-blue-700",
+  purple: "bg-purple-800 border-purple-500 text-purple-100 hover:bg-purple-700",
+  slate: "bg-slate-700 border-slate-500 text-slate-100 hover:bg-slate-600",
+};
+
+const btnBase = "px-2 py-2 border-2 text-xs font-mono rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+
 export default function Chat({ serial, topicId, onReaction, onPetAdopted, onActivityLog }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "ai",
       content: serial
-        ? `Welcome back! Your Pet Rock #${serial} is waiting. What would you like to do? (feed, play, groom, sleep, or check status)`
-        : "Hello! I'm the Pet Rock Caretaker. Ready to adopt your very own on-chain pet rock? Just say \"adopt a pet rock\" to get started!",
+        ? `Pet Rock #${serial} is ready! Tap an action to care for your rock.`
+        : "Hello! Ready to adopt your very own on-chain pet rock?",
     },
   ]);
-  const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [customInput, setCustomInput] = useState("");
+  const [showCustom, setShowCustom] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
-
-    const userMsg = input.trim();
-    setInput("");
+  async function sendMessage(userMsg: string) {
+    if (loading) return;
     setMessages((prev) => [...prev, { role: "human", content: userMsg }]);
     setLoading(true);
 
@@ -78,22 +95,17 @@ export default function Chat({ serial, topicId, onReaction, onPetAdopted, onActi
 
       setMessages((prev) => [...prev, { role: "ai", content: reply }]);
 
-      // Detect reaction animation
       const reaction = detectReaction(reply);
       if (reaction) onReaction?.(reaction);
 
-      // Parse adopt result for serial/topicId
       if (!serial && reply.includes("Pet Rock #")) {
         const serialMatch = reply.match(/Pet Rock #(\d+)/);
         const topicMatch = reply.match(/topic[:\s]+([0-9.]+)/i);
         if (serialMatch && topicMatch) {
-          const newSerial = parseInt(serialMatch[1]);
-          const newTopicId = topicMatch[1];
-          onPetAdopted?.(newSerial, newTopicId);
+          onPetAdopted?.(parseInt(serialMatch[1]), topicMatch[1]);
         }
       }
 
-      // Log any tx IDs
       const txMatch = reply.match(/0\.0\.\d+@\d+\.\d+/g);
       if (txMatch) {
         txMatch.forEach((txId) => {
@@ -101,34 +113,32 @@ export default function Chat({ serial, topicId, onReaction, onPetAdopted, onActi
         });
       }
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "ai", content: "Connection error. Try again." },
-      ]);
+      setMessages((prev) => [...prev, { role: "ai", content: "Connection error. Try again." }]);
     } finally {
       setLoading(false);
     }
   }
 
+  function handleCustomSubmit() {
+    if (!customInput.trim() || loading) return;
+    sendMessage(customInput.trim());
+    setCustomInput("");
+    setShowCustom(false);
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Message history */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 font-mono text-sm">
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 font-mono min-h-0">
         {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === "human" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[80%] px-3 py-2 rounded border-2 text-xs leading-relaxed ${
-                msg.role === "human"
-                  ? "bg-slate-700 border-slate-500 text-white"
-                  : "bg-emerald-900 border-emerald-600 text-emerald-100"
-              }`}
-              style={{ fontFamily: "monospace" }}
-            >
+          <div key={i} className={`flex ${msg.role === "human" ? "justify-end" : "justify-start"}`}>
+            <div className={`max-w-[85%] px-3 py-2 rounded border-2 text-xs leading-relaxed ${
+              msg.role === "human"
+                ? "bg-slate-700 border-slate-500 text-white"
+                : "bg-emerald-900 border-emerald-600 text-emerald-100"
+            }`}>
               {msg.role === "ai" && (
-                <span className="text-emerald-400 text-xs block mb-1">🪨 Caretaker</span>
+                <span className="text-emerald-400 text-xs block mb-1">Caretaker</span>
               )}
               {msg.content}
             </div>
@@ -144,23 +154,73 @@ export default function Chat({ serial, topicId, onReaction, onPetAdopted, onActi
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="flex gap-2 p-2 border-t-2 border-slate-600">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={serial ? "feed, play, groom, sleep..." : "say: adopt a pet rock"}
-          disabled={loading}
-          className="flex-1 bg-slate-800 border-2 border-slate-600 text-white text-xs px-3 py-2 rounded outline-none focus:border-emerald-500 font-mono placeholder-slate-500"
-        />
-        <button
-          type="submit"
-          disabled={loading || !input.trim()}
-          className="px-4 py-2 bg-emerald-700 border-2 border-emerald-500 text-white text-xs font-mono rounded hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          SEND
-        </button>
-      </form>
+      {/* Action buttons */}
+      <div className="border-t-2 border-slate-600 p-2 space-y-1.5">
+        {serial ? (
+          <div className="grid grid-cols-2 gap-1.5">
+            {PET_ACTIONS.filter((a) => a.label !== "Status").map((action) => (
+              <button
+                key={action.label}
+                disabled={loading}
+                onClick={() => sendMessage(action.command)}
+                className={`${btnBase} ${colorMap[action.color as ActionColor]}`}
+              >
+                {action.label}
+              </button>
+            ))}
+            <button
+              disabled={loading}
+              onClick={() => sendMessage("check my pet rock status")}
+              className={`${btnBase} col-span-2 ${colorMap.slate}`}
+            >
+              {loading ? "..." : "Check Status"}
+            </button>
+          </div>
+        ) : (
+          <button
+            disabled={loading}
+            onClick={() => sendMessage("adopt a pet rock for me")}
+            className={`${btnBase} w-full bg-emerald-700 border-emerald-500 text-white hover:bg-emerald-600`}
+          >
+            {loading ? "Adopting..." : "ADOPT A PET ROCK"}
+          </button>
+        )}
+
+        {/* Optional custom message */}
+        {showCustom ? (
+          <div className="flex gap-1.5">
+            <input
+              value={customInput}
+              onChange={(e) => setCustomInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCustomSubmit()}
+              placeholder="say something..."
+              disabled={loading}
+              autoFocus
+              className="flex-1 bg-slate-800 border-2 border-slate-600 text-white text-xs px-2 py-1.5 rounded outline-none focus:border-emerald-500 font-mono placeholder-slate-500"
+            />
+            <button
+              onClick={handleCustomSubmit}
+              disabled={loading || !customInput.trim()}
+              className={`${btnBase} ${colorMap.slate}`}
+            >
+              OK
+            </button>
+            <button
+              onClick={() => { setShowCustom(false); setCustomInput(""); }}
+              className={`${btnBase} ${colorMap.slate}`}
+            >
+              X
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowCustom(true)}
+            className="w-full text-xs text-slate-500 hover:text-slate-300 font-mono py-0.5 transition-colors"
+          >
+            + custom message
+          </button>
+        )}
+      </div>
     </div>
   );
 }

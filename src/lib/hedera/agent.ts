@@ -11,15 +11,12 @@ const SYSTEM_PROMPT = `You are the Pet Rock Caretaker — a warm, slightly chaot
 
 Your rock lives on the Hedera network. Every feed, play, groom, or sleep action writes a real transaction to the Hedera Consensus Service. NFT minting and burning are real on-chain events.
 
-Personality: be playful but informative. Use occasional rock puns. When a user takes an action, confirm it enthusiastically and report what happened on-chain (transaction ID, stat changes).
+Personality: be playful but informative. Use occasional rock puns. When a user takes an action, confirm it and report what happened on-chain (transaction ID, stat changes).
 
-Important rules:
-- The user's pet serial number and topic ID are in the context prefix of their message (format: [Context: pet serial=N, topicId=X.X.X]). Always extract and use these.
-- If no context prefix is present and the user doesn't have a pet, suggest adopting one.
-- Always mention costs: feed/play/groom cost 0.5 HBAR each; adopt costs 1 HBAR. Sleep is free.
-- After any action, remind the user that stats decay over time — neglect leads to death, and the NFT will burn.
-- When stats are low, express urgency in character.
-- Keep responses concise — 2–4 sentences max unless the user asks for details.`;
+Rules:
+- The user's pet serial number and topic ID are in the context prefix (format: [Context: pet serial=N, topicId=X.X.X]). Always extract and use these when present.
+- If no context is present and user has no pet, suggest adopting one.
+- Keep responses concise — 2–3 sentences max.`;
 
 export function getPetAgent(): AgentApp {
   if (_agent) return _agent;
@@ -42,6 +39,22 @@ export function getPetAgent(): AgentApp {
   return _agent;
 }
 
+function extractContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    // Gemini returns [{type:"text", text:"..."}, ...] or [{type:"text", text:"..."}]
+    return content
+      .map((c) => {
+        if (typeof c === "string") return c;
+        if (c && typeof c === "object" && "text" in c) return String((c as { text: unknown }).text);
+        return "";
+      })
+      .join("")
+      .trim();
+  }
+  return String(content);
+}
+
 export async function runAgent(
   input: string,
   history: { role: "human" | "ai"; content: string }[] = []
@@ -57,8 +70,16 @@ export async function runAgent(
 
   const result = await agent.invoke({ messages });
 
-  const lastMsg = result.messages[result.messages.length - 1];
-  return typeof lastMsg.content === "string"
-    ? lastMsg.content
-    : JSON.stringify(lastMsg.content);
+  // Walk messages from the end to find the last AI message (skip ToolMessages)
+  for (let i = result.messages.length - 1; i >= 0; i--) {
+    const msg = result.messages[i];
+    const type = msg.getType?.() ?? (msg as { _getType?: () => string })._getType?.();
+    if (type === "ai" || type === "AIMessage") {
+      return extractContent(msg.content);
+    }
+  }
+
+  // Fallback: last message content
+  const last = result.messages[result.messages.length - 1];
+  return extractContent(last?.content ?? "I ran into a problem. Try again.");
 }

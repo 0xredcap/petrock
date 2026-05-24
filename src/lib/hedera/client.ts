@@ -2,6 +2,13 @@ import { Client, PrivateKey } from "@hashgraph/sdk";
 
 let _client: Client | null = null;
 
+export function parsePrivateKey(raw: string): PrivateKey {
+  if (raw.startsWith("302e") || raw.startsWith("3026") || raw.startsWith("302")) {
+    return PrivateKey.fromStringDer(raw);
+  }
+  return PrivateKey.fromStringED25519(raw);
+}
+
 export function getHederaClient(): Client {
   if (_client) return _client;
 
@@ -17,7 +24,7 @@ export function getHederaClient(): Client {
       ? Client.forMainnet()
       : Client.forTestnet();
 
-  _client.setOperator(operatorId, PrivateKey.fromString(operatorKey));
+  _client.setOperator(operatorId, parsePrivateKey(operatorKey));
 
   return _client;
 }
