@@ -55,7 +55,6 @@ export default function World({ serial, stats, reaction, onReactionDone }: World
       const PIXI = await import("pixi.js");
       if (!mounted || !canvasRef.current) return;
 
-      // Set before app.init so all textures pick up nearest-neighbor
       PIXI.TextureSource.defaultOptions.scaleMode = "nearest";
 
       const app = new PIXI.Application();
@@ -80,14 +79,14 @@ export default function World({ serial, stats, reaction, onReactionDone }: World
       rock.y = (ROCK_HOME.row + 0.5) * TILE_SIZE * TILE_SCALE;
       worldContainer.addChild(rock);
 
-      // Dead overlay — a grey semi-transparent ellipse drawn over the rock body
+      const rockBody = drawRockBody(PIXI, serial);
+      rock.addChild(rockBody);
+
+      // Dead overlay (grey semi-transparent ellipse shown when pet dies)
       const deadOverlay = new PIXI.Graphics();
       deadOverlay.ellipse(0, 0, TILE_SIZE * TILE_SCALE * 0.5, TILE_SIZE * TILE_SCALE * 0.44)
         .fill({ color: 0x888888, alpha: 0.6 });
       deadOverlay.alpha = 0;
-
-      const rockBody = drawRockBody(PIXI, serial);
-      rock.addChild(rockBody);
       rock.addChild(deadOverlay);
 
       // Avatar
@@ -102,6 +101,23 @@ export default function World({ serial, stats, reaction, onReactionDone }: World
       ambientOverlay.rect(0, 0, CANVAS_W, CANVAS_H).fill({ color: 0x000033, alpha: 1 });
       ambientOverlay.alpha = 0;
       app.stage.addChild(ambientOverlay);
+
+      // Fireflies
+      const fireflyContainer = new PIXI.Container();
+      app.stage.addChild(fireflyContainer);
+
+      const FIREFLY_COLORS = [0xffff88, 0x88ffaa, 0xaaddff, 0xffddaa];
+      interface Firefly { g: import("pixi.js").Graphics; x: number; y: number; vx: number; vy: number; phase: number; }
+      const fireflies: Firefly[] = [];
+      for (let i = 0; i < 10; i++) {
+        const fg = new PIXI.Graphics();
+        fg.circle(0, 0, 2).fill({ color: FIREFLY_COLORS[i % FIREFLY_COLORS.length] });
+        const fx = 20 + Math.random() * (CANVAS_W - 40);
+        const fy = 20 + Math.random() * (CANVAS_H - 40);
+        fg.x = fx; fg.y = fy;
+        fireflyContainer.addChild(fg);
+        fireflies.push({ g: fg, x: fx, y: fy, vx: (Math.random() - 0.5) * 0.4, vy: (Math.random() - 0.5) * 0.4, phase: Math.random() * Math.PI * 2 });
+      }
 
       // Particles on top
       const particles = new PIXI.Container();
@@ -139,10 +155,8 @@ export default function World({ serial, stats, reaction, onReactionDone }: World
         breathT += dt;
         rock.scale.y = breathBase + 0.04 * Math.sin((breathT / breathSpeed) * Math.PI * 2);
 
-        // Sad tilt — only apply if not already tilted by tilt animation
-        if (mood < 30 && alive) {
-          rock.rotation = -0.14;
-        }
+        // Sad tilt
+        if (mood < 30 && alive) rock.rotation = -0.14;
 
         // Dead overlay
         deadOverlay.alpha = alive ? 0 : 0.6;
@@ -155,6 +169,20 @@ export default function World({ serial, stats, reaction, onReactionDone }: World
         // Ambient pulse
         ambientT += dt;
         ambientOverlay.alpha = 0.05 * (0.5 + 0.5 * Math.sin((ambientT / 30000) * Math.PI * 2));
+
+        // Fireflies
+        for (let i = 0; i < fireflies.length; i++) {
+          const ff = fireflies[i];
+          ff.phase += dt * 0.002;
+          ff.x += ff.vx + 0.25 * Math.sin(ff.phase + i * 1.3);
+          ff.y += ff.vy + 0.18 * Math.cos(ff.phase * 0.7 + i * 0.9);
+          if (ff.x < 12 || ff.x > CANVAS_W - 12) ff.vx *= -1;
+          if (ff.y < 12 || ff.y > CANVAS_H - 12) ff.vy *= -1;
+          ff.x = Math.max(12, Math.min(CANVAS_W - 12, ff.x));
+          ff.y = Math.max(12, Math.min(CANVAS_H - 12, ff.y));
+          ff.g.x = ff.x; ff.g.y = ff.y;
+          ff.g.alpha = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(ff.phase * 2.5));
+        }
 
         // Blink
         blinkT += dt;
@@ -192,7 +220,7 @@ export default function World({ serial, stats, reaction, onReactionDone }: World
           doWanderHop(rock, avatar, t.col, t.row, ROCK_HOME.col, ROCK_HOME.row);
         }
 
-        // Reaction — trigger once per new reaction value
+        // Reaction
         if (currentReaction && currentReaction !== reactionActive) {
           reactionActive = currentReaction;
           reactionT = 0;
@@ -240,69 +268,178 @@ function randomBetween(min: number, max: number) {
 
 function drawGarden(PIXI: typeof import("pixi.js"), container: import("pixi.js").Container) {
   const g = new PIXI.Graphics();
+  const TS = TILE_SIZE * TILE_SCALE;
+
+  // Base grass
   g.rect(0, 0, CANVAS_W, CANVAS_H).fill({ color: GRASS_COLOR });
 
-  for (let col = 5; col <= 10; col++) {
-    g.rect(col * TILE_SIZE * TILE_SCALE, 4 * TILE_SIZE * TILE_SCALE,
-      TILE_SIZE * TILE_SCALE, TILE_SIZE * TILE_SCALE).fill({ color: GRASS_DARK });
+  // Grass variation patches
+  const patches: [number, number][] = [[1,1],[3,2],[7,1],[11,2],[14,1],[2,8],[5,8],[10,7],[14,8],[0,5],[15,4]];
+  for (const [col, row] of patches) {
+    g.rect(col * TS, row * TS, TS, TS).fill({ color: GRASS_DARK });
   }
 
+  // Dirt path (center strip)
+  for (let col = 5; col <= 10; col++) {
+    g.rect(col * TS, 4 * TS, TS, TS).fill({ color: 0x6b4c2a });
+    g.rect(col * TS + 2, 4 * TS + 2, TS - 4, TS - 4).fill({ color: 0x7a5a35 });
+  }
+
+  // Fence border
   g.rect(0, 0, CANVAS_W, 4).fill({ color: FENCE_COLOR });
   g.rect(0, CANVAS_H - 4, CANVAS_W, 4).fill({ color: FENCE_COLOR });
   g.rect(0, 0, 4, CANVAS_H).fill({ color: FENCE_COLOR });
   g.rect(CANVAS_W - 4, 0, 4, CANVAS_H).fill({ color: FENCE_COLOR });
 
   for (let col = 0; col <= COLS; col += 2) {
-    const x = col * TILE_SIZE * TILE_SCALE;
-    g.rect(x - 3, 0, 6, 10).fill({ color: FENCE_COLOR });
-    g.rect(x - 3, CANVAS_H - 10, 6, 10).fill({ color: FENCE_COLOR });
+    const x = col * TS;
+    g.rect(x - 3, 0, 6, 14).fill({ color: FENCE_COLOR });
+    g.rect(x - 3, CANVAS_H - 14, 6, 14).fill({ color: FENCE_COLOR });
   }
 
-  const flowerSpots = [[3,3],[5,2],[11,3],[13,2],[2,7],[12,7],[6,2],[10,8]];
+  // Trees in corners
+  const trees: [number, number][] = [[1, 1], [14, 1], [1, 7], [14, 7]];
+  for (const [col, row] of trees) {
+    const tx = (col + 0.5) * TS;
+    const ty = (row + 0.5) * TS;
+    g.rect(tx - 3, ty + 4, 6, 12).fill({ color: 0x5a3820 });
+    g.circle(tx, ty - 2, 14).fill({ color: 0x2d6e20 });
+    g.circle(tx - 6, ty + 2, 10).fill({ color: 0x2d6e20 });
+    g.circle(tx + 6, ty + 2, 10).fill({ color: 0x2d6e20 });
+    g.circle(tx, ty - 6, 9).fill({ color: 0x3a8a28 });
+  }
+
+  // Flowers with stems and petals
+  const flowerSpots: [number, number][] = [[3,3],[5,2],[11,3],[13,2],[2,7],[12,7],[6,2],[10,8],[4,8],[9,2]];
   for (const [col, row] of flowerSpots) {
-    const x = (col + 0.5) * TILE_SIZE * TILE_SCALE;
-    const y = (row + 0.5) * TILE_SIZE * TILE_SCALE;
-    g.circle(x, y, 5).fill({ color: (col + row) % 2 === 0 ? FLOWER_YELLOW : FLOWER_PINK });
-    g.rect(x - 1, y, 2, 8).fill({ color: 0x2d7a00 });
+    const x = (col + 0.5) * TS;
+    const y = (row + 0.5) * TS;
+    const isYellow = (col + row) % 2 === 0;
+    g.rect(x - 1, y - 2, 2, 10).fill({ color: 0x2d7a00 });
+    g.circle(x, y - 4, 4).fill({ color: isYellow ? FLOWER_YELLOW : FLOWER_PINK });
+    g.circle(x - 4, y - 4, 2).fill({ color: isYellow ? 0xffee44 : 0xff88cc });
+    g.circle(x + 4, y - 4, 2).fill({ color: isYellow ? 0xffee44 : 0xff88cc });
+    g.circle(x, y - 8, 2).fill({ color: isYellow ? 0xffee44 : 0xff88cc });
+  }
+
+  // Pebbles for texture
+  const pebbles: [number, number][] = [[6,6],[8,4],[10,6],[5,7],[11,5]];
+  for (const [col, row] of pebbles) {
+    const x = (col + 0.3 + Math.sin(col * 7) * 0.3) * TS;
+    const y = (row + 0.3 + Math.cos(row * 11) * 0.3) * TS;
+    g.ellipse(x, y, 4, 3).fill({ color: 0x8a8a7a });
   }
 
   container.addChild(g);
 }
 
+function mulberry32(seed: number) {
+  return function (): number {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let z = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    z = (z + Math.imul(z ^ (z >>> 7), 61 | z)) ^ z;
+    return ((z ^ (z >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shiftColorNum(color: number, amount: number): number {
+  const r = Math.min(255, Math.max(0, ((color >> 16) & 0xff) + amount));
+  const gg = Math.min(255, Math.max(0, ((color >> 8) & 0xff) + amount));
+  const b = Math.min(255, Math.max(0, (color & 0xff) + amount));
+  return (r << 16) | (gg << 8) | b;
+}
+
 function drawRockBody(PIXI: typeof import("pixi.js"), serial?: number): import("pixi.js").Container {
   const container = new PIXI.Container();
   const g = new PIXI.Graphics();
-  const S = TILE_SIZE * TILE_SCALE;
-  const seed = serial ?? 1;
+  const rand = mulberry32(serial ?? 1);
 
-  const palette = [0x8b8b8b, 0x6b6b6b, 0xa09080, 0x7a8a7a, 0x5a7060, 0x8090a0, 0x70605a, 0xc0c0b0];
-  const body = palette[seed % palette.length];
+  const BODY_COLORS = [0x8B8B8B, 0x6B6B6B, 0xA09080, 0x7A8A7A, 0x5A7060, 0x8090A0, 0x70605A, 0xC0C0B0];
+  const EYE_POSITIONS = [
+    [4, 6], [7, 6],
+    [4, 8], [7, 8],
+    [3, 7], [6, 7],
+    [5, 7], [8, 7],
+    [4, 7], [8, 7],
+    [5, 6], [7, 9],
+  ];
+  const MOOD_MARKS = ["smile", "neutral", "asleep", "grin", "droopy"] as const;
 
-  g.ellipse(0, 0, S * 0.55, S * 0.48).fill({ color: body });
-  g.ellipse(S * 0.08, S * 0.08, S * 0.5, S * 0.43).fill({ color: darkenHex(body, 0.7) });
-  g.ellipse(0, 0, S * 0.5, S * 0.44).fill({ color: body });
-  g.ellipse(-S * 0.12, -S * 0.12, S * 0.22, S * 0.16).fill({ color: lightenHex(body, 1.4) });
+  const bodyColor = BODY_COLORS[Math.floor(rand() * BODY_COLORS.length)];
+  const eyePairIdx = Math.floor(rand() * 6) * 2;
+  const eye1 = EYE_POSITIONS[eyePairIdx];
+  const eye2 = EYE_POSITIONS[eyePairIdx + 1];
+  const moodMark = MOOD_MARKS[Math.floor(rand() * MOOD_MARKS.length)];
 
-  const eyeOffsets = [[-0.15, -0.05], [0.15, -0.05], [-0.12, -0.1], [0.12, -0.1]];
-  const e1 = eyeOffsets[(seed % 2) * 2];
-  const e2 = eyeOffsets[(seed % 2) * 2 + 1];
-  g.circle(e1[0] * S, e1[1] * S, S * 0.07).fill({ color: 0x1a1a2e });
-  g.circle(e2[0] * S, e2[1] * S, S * 0.07).fill({ color: 0x1a1a2e });
-  g.circle(e1[0] * S - 2, e1[1] * S - 2, 2).fill({ color: 0xffffff });
-  g.circle(e2[0] * S - 2, e2[1] * S - 2, 2).fill({ color: 0xffffff });
+  const shadowColor = shiftColorNum(bodyColor, -30);
+  const highlightColor = shiftColorNum(bodyColor, 40);
+  const eyeColor = 0x1A1A2E;
+  const markColor = 0x3A3A3A;
 
-  const marks = ["smile", "neutral", "grin"] as const;
-  const y = S * 0.15;
-  switch (marks[seed % marks.length]) {
+  const EMPTY = -1;
+  const pixels: number[][] = Array.from({ length: 16 }, () => Array(16).fill(EMPTY));
+
+  function px(x: number, y: number, color: number) {
+    if (x >= 0 && x < 16 && y >= 0 && y < 16) pixels[y][x] = color;
+  }
+  function fillRect(x: number, y: number, w: number, h: number, color: number) {
+    for (let dy = 0; dy < h; dy++)
+      for (let dx = 0; dx < w; dx++)
+        px(x + dx, y + dy, color);
+  }
+
+  // Rock body shape
+  fillRect(3, 4, 10, 9, bodyColor);
+  fillRect(2, 5, 12, 7, bodyColor);
+  fillRect(4, 3, 8, 1, bodyColor);
+  fillRect(4, 13, 8, 1, bodyColor);
+
+  // Shadow (bottom-right)
+  for (let x = 7; x < 13; x++) px(x, 13, shadowColor);
+  for (let y = 8; y < 13; y++) px(13, y, shadowColor);
+  px(12, 13, shadowColor);
+
+  // Highlight (top-left)
+  for (let x = 3; x < 7; x++) px(x, 4, highlightColor);
+  for (let y = 4; y < 8; y++) px(3, y, highlightColor);
+
+  // Eyes
+  fillRect(eye1[0], eye1[1], 2, 2, eyeColor);
+  fillRect(eye2[0], eye2[1], 2, 2, eyeColor);
+  px(eye1[0], eye1[1], 0xFFFFFF);
+  px(eye2[0], eye2[1], 0xFFFFFF);
+
+  // Mood mark
+  switch (moodMark) {
     case "smile":
-      g.arc(0, y - S * 0.03, S * 0.14, 0.2, Math.PI - 0.2).stroke({ color: 0x3a3a3a, width: 2 });
+      px(5, 10, markColor); px(6, 11, markColor); px(7, 11, markColor); px(8, 10, markColor);
       break;
     case "grin":
-      g.rect(-S * 0.14, y, S * 0.28, S * 0.06).fill({ color: 0x3a3a3a });
+      for (let x = 5; x <= 8; x++) px(x, 10, markColor);
+      px(5, 11, markColor); px(8, 11, markColor);
       break;
     case "neutral":
-      g.rect(-S * 0.12, y, S * 0.24, 2).fill({ color: 0x3a3a3a });
+      for (let x = 5; x <= 8; x++) px(x, 10, markColor);
       break;
+    case "asleep":
+      px(5, 10, markColor); px(6, 11, markColor); px(7, 11, markColor); px(8, 10, markColor);
+      px(5, 9, markColor); px(8, 9, markColor);
+      break;
+    case "droopy":
+      px(5, 11, markColor); px(6, 10, markColor); px(7, 10, markColor); px(8, 11, markColor);
+      break;
+  }
+
+  // Render each pixel as a 4px square, centered at origin
+  const PS = 4;
+  const OFFSET = -8 * PS;
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      if (pixels[y][x] !== EMPTY) {
+        g.rect(OFFSET + x * PS, OFFSET + y * PS, PS, PS).fill({ color: pixels[y][x] });
+      }
+    }
   }
 
   container.addChild(g);
@@ -450,18 +587,6 @@ function animateFloat(obj: import("pixi.js").Container, onDone: () => void, dura
 
 function easeInOut(t: number) {
   return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-}
-
-function darkenHex(color: number, f: number) {
-  return (Math.floor(((color >> 16) & 0xff) * f) << 16) |
-    (Math.floor(((color >> 8) & 0xff) * f) << 8) |
-    Math.floor((color & 0xff) * f);
-}
-
-function lightenHex(color: number, f: number) {
-  return (Math.min(255, Math.floor(((color >> 16) & 0xff) * f)) << 16) |
-    (Math.min(255, Math.floor(((color >> 8) & 0xff) * f)) << 8) |
-    Math.min(255, Math.floor((color & 0xff) * f));
 }
 
 function getWanderTargets() {

@@ -8,7 +8,7 @@ export const maxDuration = 60;
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 export async function POST(request: NextRequest) {
-  // Read body before passing request to mppx (which also reads the stream)
+  // Read body before chargeAction consumes the stream
   const body = await request.clone().json().catch(() => ({})) as { owner?: string };
 
   const result = await chargeAction(request, "1");
@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const owner = body.owner ?? "anonymous";
+    void owner;
 
     const topicId = await createPetTopic();
     const serial = await mintRock(`${appUrl}/api/metadata/${Date.now()}`);

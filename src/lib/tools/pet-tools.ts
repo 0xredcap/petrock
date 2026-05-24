@@ -3,7 +3,6 @@ import { z } from "zod";
 import { submitPetMessage, readPetMessages, createPetTopic } from "@/lib/hedera/hcs";
 import { mintRock, burnRock } from "@/lib/hedera/nft";
 import { computeCurrentStats, isDead } from "@/lib/hedera/stats";
-
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 export const adoptPetTool = new DynamicStructuredTool({
@@ -13,7 +12,7 @@ export const adoptPetTool = new DynamicStructuredTool({
   schema: z.object({
     owner: z.string().describe("A display name or identifier for the owner"),
   }),
-  func: async ({ owner }) => {
+  func: async ({ owner: _owner }) => {
     try {
       const topicId = await createPetTopic();
       const serial = await mintRock(`${appUrl}/api/metadata/${Date.now()}`);

@@ -5,7 +5,6 @@ import {
   TokenMintTransaction,
   TokenBurnTransaction,
   TokenId,
-  PrivateKey,
   AccountId,
 } from "@hashgraph/sdk";
 import { getHederaClient, parsePrivateKey } from "./client";

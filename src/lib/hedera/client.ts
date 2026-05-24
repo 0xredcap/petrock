@@ -2,12 +2,10 @@ import { Client, PrivateKey } from "@hashgraph/sdk";
 
 let _client: Client | null = null;
 
-function parsePrivateKey(raw: string): PrivateKey {
-  // DER-encoded keys start with 302e or 3026 — use fromStringDer
+export function parsePrivateKey(raw: string): PrivateKey {
   if (raw.startsWith("302e") || raw.startsWith("3026") || raw.startsWith("302")) {
     return PrivateKey.fromStringDer(raw);
   }
-  // ED25519 raw hex (64 chars) or ECDSA
   return PrivateKey.fromStringED25519(raw);
 }
 
@@ -30,5 +28,3 @@ export function getHederaClient(): Client {
 
   return _client;
 }
-
-export { parsePrivateKey };
