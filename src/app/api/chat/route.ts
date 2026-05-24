@@ -18,9 +18,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ reply });
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("[pet-rock] Chat error:", err);
     return NextResponse.json(
-      { error: "Agent error. Check server logs." },
+      { error: `Agent error: ${message}` },
       { status: 500 }
     );
   }
